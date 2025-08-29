@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>School Data Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; }
+        .header { padding: 15px 30px; display: flex; align-items: center; }
+        .header-title { font-size: 1.5em; font-weight: 700; background: linear-gradient(90deg, #FF5F5F, #FF9116); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .header-logo { height: 90px; margin-right: 15px; }
+        .container { padding: 2em; }
+        h2 { color: #ffffff; font-weight: 500; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .card { background-color: #1e1e1e; border-radius: 8px; padding: 1.5em; margin-top: 1.5em; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
+        label { font-weight: 500; color: #bbbbbb; font-size: 1.1em; display: block; margin-bottom: 8px; }
+        select, .config-input { width: 100%; padding: 12px; margin-top: 10px; background-color: #333; color: #e0e0e0; border: 1px solid #555; border-radius: 6px; font-size: 1em; box-sizing: border-box; }
+        .button-container { display: flex; justify-content: center; margin-top: 2em; position: relative; }
+        .submit-btn { padding: 15px 30px; background: linear-gradient(90deg, #FF5F5F, #FF9116); color: white; border: none; border-radius: 6px; font-size: 1.2em; font-weight: 500; cursor: pointer; transition: opacity 0.3s ease; }
+        .submit-btn:hover { opacity: 0.9; }
+        .submit-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+        .loader { border: 5px solid #333; border-top: 5px solid #FF5F5F; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; position: absolute; top: 50%; left: 50%; margin-top: -25px; margin-left: -25px; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Checkbox styles */
+        #school-checkbox-container {
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .checkbox-item label {
+            margin-bottom: 0;
+            font-weight: 400;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        /* Table styles */
+        .school-details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .school-details-table th, .school-details-table td {
+            border: 1px solid #444;
+            padding: 10px;
+            text-align: left;
+        }
+        .school-details-table th {
+            background-color: #333;
+            color: #fff;
+        }
+        .school-details-table tbody tr:nth-child(odd) {
+            background-color: #2a2a2a;
+        }
+        .school-details-table tbody tr:nth-child(even) {
+            background-color: #1e1e1e;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <img src="{{ url_for('static', filename='assets/msg_logo.png') }}" alt="Logo" class="header-logo">
+        <span class="header-title">School District Data Explorer (v2)</span>
+    </header>
+
+    <div class="container">
+        <form id="proposal-form" action="/proposal" method="POST">
+            <div class="card">
+                <h2>1. Select District & Schools</h2>
+                <div>
+                    <label for="district">District Name:</label>
+                    <select id="district" name="district">
+                        {% for district in districts %}
+                            <option value="{{ district }}">{{ district }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="margin-top: 1em;">
+                    <label for="school-checkbox-container">School Names (Select one or more):</label>
+                    <div id="school-checkbox-container">
+                        <!-- Checkboxes will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>2. Configure Program</h2>
+                <div style="display: flex; gap: 20px;">
+                    <div style="flex-grow: 1;">
+                        <label for="weeks-input">Number of Weeks:</label>
+                        <input type="number" id="weeks-input" name="num_weeks" class="config-input" value="30">
+                    </div>
+                    <div style="flex-grow: 1;">
+                        <label for="days-input">Days per Week:</label>
+                        <input type="number" id="days-input" name="days_per_week" class="config-input" value="2">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>3. Cost Summary</h2>
+                <label for="cost-proposal-input">Total Estimated Cost:</label>
+                <input type="text" id="cost-proposal-input" name="cost_proposal" class="config-input" readonly>
+            </div>
+
+            <div class="card" id="school-funding-card" style="display: none;">
+                <h2>4. Selected School Funding Details</h2>
+                <table class="school-details-table">
+                    <thead>
+                        <tr>
+                            <th>School Name</th>
+                            <th>Total Enrollment</th>
+                            <th>FRPM Percent (%)</th>
+                            <th>Estimated Funding (USD)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="school-funding-body">
+                        <!-- School funding details will be dynamically inserted here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="button-container">
+                <button type="submit" class="submit-btn" id="generate-btn">Generate AI Proposal</button>
+                <div class="loader" id="loader"></div>
+            </div>
+        </form>
+    </div>
+
+<script>
+    const allData = JSON.parse('{{ all_data|safe }}');
+    const districtSelect = document.getElementById('district');
+    const schoolCheckboxContainer = document.getElementById('school-checkbox-container');
+    const weeksInput = document.getElementById('weeks-input');
+    const daysInput = document.getElementById('days-input');
+    const costProposalInput = document.getElementById('cost-proposal-input');
+    const proposalForm = document.getElementById('proposal-form');
+    const generateBtn = document.getElementById('generate-btn');
+    const loader = document.getElementById('loader');
+    const schoolFundingCard = document.getElementById('school-funding-card');
+    const schoolFundingBody = document.getElementById('school-funding-body');
+
+    // Cost per school per day based on user-provided formula
+    // ($9450 / 7 weeks / 2 days / 2 schools) = $337.50
+    const COST_PER_SCHOOL_DAY = 337.50;
+
+    function updateSchools() {
+        const selectedDistrict = districtSelect.value;
+        const schoolsInDistrict = allData.filter(row => row['District Name'] === selectedDistrict);
+
+        schoolCheckboxContainer.innerHTML = ""; // Clear existing checkboxes
+        
+        schoolsInDistrict.forEach((school, index) => {
+            const schoolName = school['School Name'];
+            const checkboxId = `school-${index}`;
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'checkbox-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'schoolname';
+            checkbox.value = schoolName;
+            checkbox.id = checkboxId;
+            // Store all relevant school data on the checkbox itself
+            checkbox.dataset.schoolData = JSON.stringify(school);
+            // Add event listener to each checkbox to recalculate cost and update table on change
+            checkbox.addEventListener('change', () => {
+                updateCost();
+                updateSchoolFundingTable();
+            });
+
+            const label = document.createElement('label');
+            label.htmlFor = checkboxId;
+            label.textContent = schoolName;
+
+            itemDiv.appendChild(checkbox);
+            itemDiv.appendChild(label);
+            schoolCheckboxContainer.appendChild(itemDiv);
+        });
+        
+        // Update cost and funding table after populating checkboxes (initially zero/empty)
+        updateCost();
+        updateSchoolFundingTable();
+    }
+
+    function updateCost() {
+        const selectedCheckboxes = document.querySelectorAll('input[name="schoolname"]:checked');
+        const numSchools = selectedCheckboxes.length;
+
+        const numWeeks = parseInt(weeksInput.value) || 0;
+        const daysPerWeek = parseInt(daysInput.value) || 0;
+
+        const totalCost = numSchools * numWeeks * daysPerWeek * COST_PER_SCHOOL_DAY;
+
+        // Display as currency
+        costProposalInput.value = '$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function updateSchoolFundingTable() {
+        const selectedCheckboxes = document.querySelectorAll('input[name="schoolname"]:checked');
+        schoolFundingBody.innerHTML = ''; // Clear existing table rows
+
+        if (selectedCheckboxes.length > 0) {
+            schoolFundingCard.style.display = 'block'; // Show the card if schools are selected
+            selectedCheckboxes.forEach(checkbox => {
+                const school = JSON.parse(checkbox.dataset.schoolData);
+                const row = schoolFundingBody.insertRow();
+                row.insertCell().textContent = school['School Name'];
+                row.insertCell().textContent = school['Total Enrollment'];
+                // Format FRPM Percent as a percentage
+                const frpmPercent = parseFloat(school['FRPM Percent (%)']);
+                row.insertCell().textContent = isNaN(frpmPercent) ? 'N/A' : (frpmPercent * 100).toFixed(2) + '%';
+                // Format Estimated Funding as currency
+                const estimatedFunding = parseFloat(school['Estimated Funding (USD)']);
+                row.insertCell().textContent = isNaN(estimatedFunding) ? 'N/A' : '$' + estimatedFunding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            });
+        } else {
+            schoolFundingCard.style.display = 'none'; // Hide the card if no schools are selected
+        }
+    }
+
+
+    proposalForm.addEventListener('submit', function(event) {
+        // Before submitting, remove currency formatting to send a clean number to the backend
+        if (costProposalInput) {
+            costProposalInput.value = costProposalInput.value.replace(/[^0-9.]/g, '');
+        }
+
+        // Check if at least one school is selected
+        const selectedCheckboxes = document.querySelectorAll('input[name="schoolname"]:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert("Please select at least one school.");
+            event.preventDefault(); // Stop the form from submitting
+            return;
+        }
+
+        generateBtn.style.display = 'none';
+        loader.style.display = 'block';
+    });
+
+    // Event Listeners
+    districtSelect.addEventListener('change', updateSchools);
+    weeksInput.addEventListener('input', updateCost);
+    daysInput.addEventListener('input', updateCost);
+
+    // Initial Load
+    document.addEventListener('DOMContentLoaded', updateSchools);
+</script>
+
+</body>
+</html>
